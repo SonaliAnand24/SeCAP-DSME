@@ -17,7 +17,7 @@
 
 BITS Pilani, Hyderabad Campus · IIT (ISM) Dhanbad
 
-[![Email](https://img.shields.io/badge/Email-sonalianand2406%40gmail.com-EA4335?style=flat-square&logo=gmail)](mailto:sonalianand2406@gmail.com)li
+[![Email](https://img.shields.io/badge/Email-sonalianand2406%40gmail.com-EA4335?style=flat-square&logo=gmail)](mailto:sonalianand2406@gmail.com)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat-square&logo=linkedin)](https://linkedin.com/in/sonali-anand-aa175a189)
 
 *Supported by DST-SERB Startup Research Grant SRG/2023/002016*
@@ -171,7 +171,7 @@ secap-dsme/
 ## Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/secap-dsme.git
+git clone https://github.com/SonaliAnand24/secap-dsme.git
 cd secap-dsme
 pip install -r requirements.txt
 ```
