@@ -13,12 +13,9 @@
 
 *"Delay-Bounded Adaptive MAC for IEEE 802.15.4e DSME Networks: Enhancing Resilience under Bursty and Dynamic IoT Traffic"*
 
-**Sonali Anand** *(lead author & repository maintainer)*, Alekhya Gorrela, Raziur Rahman, Nikumani Choudhury, Anakhi Hazarika, Dipamani Choudhury, Tamoghna Ojha
+**Sonali Anand**, Alekhya Gorrela, Raziur Rahman, Nikumani Choudhury, Anakhi Hazarika, Dipamani Choudhury, Tamoghna Ojha
 
 BITS Pilani, Hyderabad Campus · IIT (ISM) Dhanbad
-
-[![Email](https://img.shields.io/badge/Email-sonalianand2406%40gmail.com-EA4335?style=flat-square&logo=gmail)](mailto:sonalianand2406@gmail.com)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat-square&logo=linkedin)](https://linkedin.com/in/sonali-anand-aa175a189)
 
 *Supported by DST-SERB Startup Research Grant SRG/2023/002016*
 
@@ -26,99 +23,108 @@ BITS Pilani, Hyderabad Campus · IIT (ISM) Dhanbad
 
 ---
 
-## Overview
+## Abstract
 
-IEEE 802.15.4e DSME uses **CAP Reduction (CR)** to maximise GTS (Contention-Free Period) slots for data, but this static approach causes severe queue buildup and delay spikes under bursty or event-driven IoT traffic.
+IEEE 802.15.4e DSME's static CAP Reduction (CR) mechanism improves channel efficiency by minimising Contention Access Periods, but fails under bursty or dynamic IoT traffic — causing queue buildup, high latency, and degraded responsiveness.
 
-We propose **SeCAP (Selective CAP Preservation)** — a lightweight, standard-compliant adaptive MAC mechanism that:
-
-- Monitors the CAP queue length at each coordinator every multi-superframe
-- Switches between CR mode (high throughput) and NCR mode (low latency) based on a theoretically-derived delay threshold
-- Communicates mode changes to all devices via the existing CAP Reduction flag in the IEEE 802.15.4e beacon — **no protocol modifications required**
+We propose **SeCAP (Selective CAP Preservation)**, a delay-aware adaptive MAC algorithm that monitors CAP queue occupancy at each coordinator and dynamically toggles between CR and non-CR (NCR) modes. When the queue length exceeds a threshold `Qth`, SeCAP restores CAPs across all superframes; when traffic is light, it re-enables CR to maximise CFP throughput. We derive a delay bound analytically using M/M/1 queueing theory and validate against Static DSME, ACR, and DCR baselines.
 
 ---
 
 ## Key Results
 
-### Packet Delay vs. Offered Load (Table I)
-
-| Offered Load | Static DSME | ACR | DCR | **SeCAP (ours)** |
-|---|---|---|---|---|
-| 0.1 pkts/s | 30 ms | 28 ms | 25 ms | **22 ms** |
-| 0.5 pkts/s | 80 ms | 70 ms | 60 ms | **50 ms** |
-| 0.7 pkts/s | 140 ms | 115 ms | 90 ms | **80 ms** |
-| 0.9 pkts/s | 200 ms | 150 ms | 120 ms | **100 ms** |
-
-> **~50% delay reduction** at high load vs. static DSME.
-
-### Throughput–Delay Trade-off (Table III, 50 nodes, high load)
-
-| Scheme | Throughput | Delay |
-|---|---|---|
+| Scheme | Throughput (%) | Avg Delay @ High Load (ms) |
+|--------|---------------|--------------------------|
 | Static DSME (CR) | 95% | 200 ms |
 | ACR | 90% | 150 ms |
 | DCR | 93% | 120 ms |
 | **SeCAP (ours)** | **92%** | **80 ms** |
 
-> SeCAP nearly matches full CR throughput while delivering near-NCR latency — the best trade-off of any evaluated scheme.
+> 50 nodes, high load. SeCAP reduces delay by **50%** vs. static CR with only 1–2% throughput penalty vs. DCR.
 
 ---
 
-## Problem Formulation
+## Problem Statement
 
-### Why Static CAP Reduction Fails
-
-In DSME's CR mode, only the **first superframe** of each multi-superframe contains a CAP. With `MO−SO = 2`, this means 3 out of 4 superframes have no contention access at all. Under bursty traffic, pending CSMA/CA frames accumulate rapidly and cannot be served, leading to unbounded delay growth.
-
-### M/M/1 Queue Delay Model
-
-Each coordinator's CAP queue is modelled as an M/M/1 system:
+Static DSME CAP Reduction allocates a CAP only in the first superframe of each multi-superframe. This maximises CFP (data) slots but creates a bottleneck for contention-based traffic during bursts:
 
 ```
-Davg = 1 / (µ − λ)          (Eq. 1 — average total delay)
+Static CR (BO=6, MO=5, SO=3):
+┌─────────────────────────────────────────────────────────────────┐
+│ SF1: [BS][CAP][CFP] │ SF2: [BS][CFP] │ SF3: [BS][CFP] │ SF4: [BS][CFP] │
+└─────────────────────────────────────────────────────────────────┘
+      ↑ Only 1 CAP per multi-superframe
+      → Queue builds up under bursty load → high delay
 
-Lq   = ρ² / (1 − ρ)          (Eq. 2 — average queue length, ρ = λ/µ)
-
-E[Wq] = λ / (µ(µ − λ))       (Eq. 3 — average queuing delay)
+SeCAP NCR mode (triggered when Q > Qth):
+┌──────────────────────────────────────────────────────────────────────┐
+│ SF1: [BS][CAP][CFP] │ SF2: [BS][CAP][CFP] │ SF3: [BS][CAP][CFP] │ ... │
+└──────────────────────────────────────────────────────────────────────┘
+      ↑ CAP in every superframe → backlog cleared rapidly
 ```
 
-The **delay threshold** that triggers CAP preservation is derived analytically:
+---
+
+## Analytical Model
+
+### M/M/1 Queue (Equations 1–4 from paper)
+
+Each coordinator's CAP queue is modelled as an M/M/1 queue (arrival rate λ, service rate µ):
 
 ```
-λthr = µ − 1/Dthr             (Eq. 2 from Section II-B)
+D_avg  = 1 / (µ - λ)                   [Eq. 1 — average total delay]
+L_q    = ρ² / (1 - ρ),   ρ = λ/µ      [Eq. 2 — average queue length]
+E[W_q] = λ / (µ(µ - λ))               [Eq. 3 — average waiting time]
+D_ub   = 1 / (µ - λ)                   [Eq. 4 — worst-case delay upper bound]
 ```
 
-When `λ > λthr`, the queue operates beyond the tolerable delay bound and the algorithm switches to NCR mode, effectively doubling `µ` by providing a CAP in every superframe.
+### Delay Threshold Derivation
+
+Given maximum acceptable delay `D_thr`, the critical arrival rate threshold is:
+
+```
+λ_thr = µ - 1/D_thr
+```
+
+When λ > λ_thr (equivalently Q > Qth), SeCAP switches to NCR mode, effectively increasing µ by providing a CAP in every superframe. This drives ρ back below 1 and restores bounded delay.
 
 ### Worst-Case Delay Bound
 
 ```
-Dmax ≈ Qth × Tsf
+D_max ≈ Qth × T_sf
 ```
 
-With `Tsf = 100 ms` and `Qth = 3` (optimal threshold), the worst-case delay is bounded at ~300 ms — a hard guarantee absent in ACR/DCR.
+Example: `Qth = 10`, `T_sf = 100 ms` → `D_max ≈ 1 s`. The threshold `Qth` is therefore a direct design knob for latency SLAs.
 
 ---
 
-## Algorithm — Selective CAP Preservation (Algorithm 1)
+## SeCAP Algorithm
 
-```
-Input:  Queue threshold Qth, current CAP queue length Q
-Init:   CAP mode ← CR
+**Algorithm 1 — Selective CAP Preservation (runs at each Coordinator)**
+
+```python
+# Input:  Qth — queue threshold derived from M/M/1 model
+# Init:   CAP mode = CR
 
 for each beacon interval (every multi-superframe):
-    if Q > Qth:
-        CAP mode ← NCR          # Preserve CAP in ALL superframes
-        Set CAP Reduction Flag in beacon ← 0
-    else:
-        CAP mode ← CR           # CAP only in first superframe
-        Set CAP Reduction Flag in beacon ← 1
+    Q = measure_cap_queue_length()
 
-    Broadcast beacon with updated CAP Reduction Flag
-    Apply mode for next multi-superframe
+    if Q > Qth:
+        mode = NCR                  # CAP in every superframe
+        beacon.cap_reduction = 0    # standard beacon flag
+    else:
+        mode = CR                   # CAP only in first superframe
+        beacon.cap_reduction = 1
+
+    broadcast_beacon(mode)
+    apply_mode_next_multisuperframe(mode)
 ```
 
-**Why this works:** The coordinator uses the standard IEEE 802.15.4e beacon's `CAP Reduction` bit — no new control messages, no changes to the frame format. All receiving nodes automatically reconfigure their superframe structure upon receiving the next beacon.
+Key properties:
+- **Standard-compliant** — reuses the existing CAP Reduction flag in the beacon's Superframe Specification; no new messages or fields
+- **Lightweight** — O(1) per beacon interval, no global coordination needed
+- **Delay-bounded** — `Qth` is analytically derived, not heuristically tuned
+- **Only scheme with a formal delay guarantee** among all compared approaches
 
 ---
 
@@ -129,39 +135,37 @@ secap-dsme/
 │
 ├── 📂 src/
 │   ├── secap/
-│   │   ├── algorithm.py            # Algorithm 1: SeCAP coordinator logic
-│   │   └── queue_monitor.py        # CAP queue length tracking
+│   │   ├── coordinator.py          # SeCAP logic: queue monitor + CR/NCR toggle
+│   │   ├── queue_model.py          # M/M/1 model (D_avg, L_q, E[Wq], λ_thr)
+│   │   └── threshold.py            # Qth derivation from D_thr and µ
 │   ├── dsme/
-│   │   ├── superframe.py           # Multi-superframe structure (BO, MO, SO)
-│   │   └── beacon.py               # Beacon generation with CAP Reduction flag
+│   │   ├── superframe.py           # Multi-superframe timing model
+│   │   └── mac_layer.py            # CAP/CFP slot accounting
 │   ├── baselines/
-│   │   ├── static_cr.py            # Static CAP Reduction (paper baseline)
-│   │   ├── acr.py                  # Alternating CAP Reduction [Meyer et al. 2020]
-│   │   └── dcr.py                  # Dynamic CAP Reduction [Meyer et al. 2020]
+│   │   ├── static_dsme.py          # Static CAP Reduction baseline
+│   │   ├── acr.py                  # Alternating CAP Reduction
+│   │   └── dcr.py                  # Dynamic CAP Reduction
 │   ├── network/
-│   │   ├── topology.py             # Cluster-tree topology builder
-│   │   └── traffic.py              # Poisson traffic + bursty event generator
+│   │   └── topology.py             # Cluster-tree topology + Poisson traffic
 │   └── metrics/
-│       └── evaluator.py            # Delay, throughput, energy, overhead metrics
+│       └── evaluator.py            # Delay, throughput, energy, overhead
 │
 ├── 📂 configs/
-│   ├── default.yaml                # Simulation parameters
-│   └── sensitivity.yaml            # Threshold T sweep configuration
+│   ├── default.yaml                # Default simulation parameters
+│   └── sensitivity.yaml            # Threshold sensitivity sweep
 │
 ├── 📂 results/
-│   ├── figures/                    # Reproduced plots (Fig. 3a–3e from paper)
-│   └── logs/                       # Raw simulation output (JSON)
+│   ├── figures/                    # Reproduced Fig. 3a–3e
+│   ├── logs/                       # Raw JSON output
+│   └── tables/                     # CSV of Tables I–III
 │
 ├── 📂 notebooks/
-│   ├── 01_mm1_delay_model.ipynb    # Analytical delay model walkthrough
-│   ├── 02_algorithm_trace.ipynb    # Step-by-step SeCAP execution trace
-│   ├── 03_results_reproduction.ipynb  # Reproduce all paper figures
-│   └── 04_threshold_sensitivity.ipynb # Fig. 3d: optimal Qth analysis
+│   ├── 01_mm1_delay_analysis.ipynb
+│   ├── 02_secap_vs_baselines.ipynb
+│   ├── 03_threshold_sensitivity.ipynb
+│   └── 04_energy_overhead.ipynb
 │
-├── 📂 docs/
-│   └── CAP_REDUCTION_PRIMER.md     # Background on DSME CAP/CFP structure
-│
-├── run_simulation.py               # Main entry point — reproduces all 5 plots
+├── run_simulation.py               # Main entry point
 ├── requirements.txt
 └── README.md
 ```
@@ -176,46 +180,28 @@ cd secap-dsme
 pip install -r requirements.txt
 ```
 
-**Requirements:** Python 3.9+, NumPy, Matplotlib, PyYAML, tqdm, SciPy
-
 ---
 
 ## Running Simulations
 
-### Reproduce all paper figures (Fig. 3a–3e)
-
 ```bash
+# Reproduce all paper figures at once
 python run_simulation.py --mode full --save results/figures/
-```
 
-### Individual experiments
-
-```bash
-# (a) Packet delay vs. offered load
+# Fig. 3a — delay vs. offered load
 python run_simulation.py --mode delay_vs_load
 
-# (b) Throughput vs. node density
+# Fig. 3b — throughput vs. node density
 python run_simulation.py --mode throughput_vs_nodes
 
-# (c) Energy consumption comparison
+# Fig. 3c — energy per node
 python run_simulation.py --mode energy
 
-# (d) SeCAP delay vs. threshold T (sensitivity analysis)
-python run_simulation.py --mode threshold_sweep
+# Fig. 3d — SeCAP delay vs. threshold T
+python run_simulation.py --mode threshold_sensitivity
 
-# (e) Control overhead comparison
+# Fig. 3e — control overhead
 python run_simulation.py --mode overhead
-```
-
-### Custom configuration
-
-```bash
-python run_simulation.py \
-  --config configs/default.yaml \
-  --nodes 50 \
-  --load 0.7 \
-  --threshold 3 \
-  --so 3 --mo 5 --bo 6
 ```
 
 ---
@@ -224,51 +210,36 @@ python run_simulation.py \
 
 | Parameter | Value |
 |-----------|-------|
-| MAC standard | IEEE 802.15.4e DSME |
-| Superframe Order (SO) | 3 |
-| Multi-superframe Order (MO) | 5 |
-| Beacon Order (BO) | 6 |
-| Superframes per multi-superframe | 2^(MO−SO) = 4 |
-| CAP slots per superframe | 8 (slots 1–8) |
-| CFP/GTS slots per superframe | 7 (slots 9–15) |
-| Offered load range | 0.1 – 0.9 pkts/s |
-| Node count range | 10 – 90 |
-| SeCAP threshold (optimal) | T = 3 |
-| Traffic model | Poisson + bursty events |
-| Baselines compared | Static CR, ACR, DCR |
+| BO / MO / SO | 6 / 5 / 3 |
+| Superframes per multi-SF | 4  (= 2^(MO−SO)) |
+| CAP slots per superframe | 8 |
+| CFP (GTS) slots | 7 |
+| Traffic model | Poisson, λ = 0.1–0.9 pkts/s |
+| Node range | 10–90 nodes |
+| Optimal threshold T | 3 |
+| Superframe duration T_sf | 100 ms |
 
 ---
 
-## Theoretical Highlights
+## Baseline Comparison
 
-### The U-Shaped Threshold Curve (Fig. 3d)
+| Scheme | CAP Policy | Delay Guarantee | Standard-Compliant |
+|--------|-----------|----------------|-------------------|
+| Static DSME (CR) | Fixed — 1 CAP per multi-SF | ✗ | ✓ |
+| ACR | Alternates CR / NCR each multi-SF | ✗ | ✓ |
+| DCR | Heuristic CAP slot count adjustment | ✗ | ✓ |
+| **SeCAP (ours)** | Queue-triggered CR ↔ NCR | **✓ (M/M/1 bound)** | ✓ |
 
-The SeCAP delay vs. threshold T follows a U-shape with a minimum at T = 3:
-
-- **T too low (T=1):** CAP preserved too often → needless CFP reduction → higher data delay
-- **T = 3 (optimal):** CAP preserved exactly when needed → minimum delay ~70 ms
-- **T too high (T≥4):** CAP preserved too late → backlog builds → delay rises to ~95–120 ms
-
-This analytically-guided threshold selection distinguishes SeCAP from heuristic approaches like ACR/DCR.
-
-### Why SeCAP Outperforms DCR
-
-DCR adjusts the *number of CAP slots* per superframe; SeCAP adjusts the *number of superframes containing a CAP*. This coarser, beacon-aligned adaptation is more efficient because:
-
-1. It is fully encoded in the existing CAP Reduction flag — zero overhead
-2. Mode changes take effect at the next beacon — one multi-superframe latency
-3. The delay bound is provable from the M/M/1 analysis, not just empirical
+SeCAP is the **only** scheme with a formal, analytically derived delay bound.
 
 ---
 
-## Baselines Implemented
+## Related Work in This Series
 
-| Scheme | Source | Description |
-|--------|--------|-------------|
-| Static DSME (CR) | IEEE 802.15.4-2020 | CAP only in first superframe |
-| ACR | Meyer et al., AdHoc-Now 2020 | Alternates CR/NCR every multi-superframe |
-| DCR | Meyer et al., AdHoc-Now 2020 | Dynamically adjusts CAP slots by traffic estimate |
-| **SeCAP** | **This work** | Queue-monitored, delay-bounded CAP preservation |
+| Repository | Contribution |
+|-----------|-------------|
+| **[secap-dsme](https://github.com/SonaliAnand24/secap-dsme)** ← *this repo* | Delay-bounded adaptive CAP management via SeCAP |
+| **[dsme-pso](https://github.com/SonaliAnand24/dsme-pso)** | PSO-based multi-superframe parameter optimisation |
 
 ---
 
@@ -281,8 +252,9 @@ If you build upon this work, please cite:
   author    = {Anand, Sonali and Gorrela, Alekhya and Rahman, Raziur
                and Choudhury, Nikumani and Hazarika, Anakhi
                and Choudhury, Dipamani and Ojha, Tamoghna},
-  title     = {Delay-Bounded Adaptive {MAC} for {IEEE} 802.15.4e {DSME} Networks:
-               Enhancing Resilience under Bursty and Dynamic {IoT} Traffic},
+  title     = {Delay-Bounded Adaptive {MAC} for {IEEE} 802.15.4e {DSME}
+               Networks: Enhancing Resilience under Bursty and Dynamic
+               {IoT} Traffic},
   booktitle = {[Conference Name]},
   year      = {2025},
   note      = {Supported by DST-SERB Grant SRG/2023/002016}
@@ -300,14 +272,15 @@ MTech, Computer Science & Information Systems
 BITS Pilani, Hyderabad Campus
 
 [![Email](https://img.shields.io/badge/Email-sonalianand2406%40gmail.com-EA4335?style=flat-square&logo=gmail)](mailto:sonalianand2406@gmail.com)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat-square&logo=linkedin)](https://linkedin.com/in/sonali-anand-aa175a189)
+[![GitHub](https://img.shields.io/badge/GitHub-SonaliAnand24-181717?style=flat-square&logo=github)](https://github.com/SonaliAnand24)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat-square&logo=linkedin)](https://linkedin.com/in/sonali-anand-aa175a189/)
 
 ### Co-Authors
 
 **Alekhya Gorrela** · BITS Pilani, Hyderabad Campus
 
 **Raziur Rahman** · BITS Pilani, Hyderabad Campus
-l
+
 **Nikumani Choudhury** · BITS Pilani, Hyderabad Campus *(Supervisor)*
 
 **Anakhi Hazarika** · BITS Pilani, Hyderabad Campus
@@ -318,16 +291,6 @@ l
 
 ---
 
-## Related Repository
-
-This work extends the PSO-based parameter tuning framework from our earlier paper:
-
-> *"Improving Network Efficiency in Clustered Tree Topology through PSO Optimization in IEEE 802.15.4-DSME based IoT Networks"* — [[Repository](https://github.com/SonaliAnand24/dsme-pso)]
-
-Both repositories share the same DSME cluster-tree simulation infrastructure and are part of a broader research effort on **adaptive MAC-layer optimisation for industrial IoT**.
-
----
-
 ## Acknowledgement
 
 This work is supported by the **Science and Engineering Research Board, Department of Science and Technology, Government of India** through the Startup Research Grant under Grant **SRG/2023/002016**.
@@ -335,5 +298,5 @@ This work is supported by the **Science and Engineering Research Board, Departme
 ---
 
 <div align="center">
-<sub>IEEE 802.15.4e · DSME · CAP Reduction · Adaptive MAC · Bursty IoT · M/M/1 Queuing · Wireless Sensor Networks</sub>
+<sub>IEEE 802.15.4e · DSME · Adaptive MAC · CAP Reduction · Bursty IoT Traffic · M/M/1 Queueing · Resilient Protocols</sub>
 </div>
