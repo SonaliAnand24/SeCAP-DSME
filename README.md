@@ -58,7 +58,7 @@ Static CR (BO=6, MO=5, SO=3):
 
 SeCAP NCR mode (triggered when Q > Qth):
 ┌──────────────────────────────────────────────────────────────────────┐
-│ SF1: [BS][CAP][CFP] │ SF2: [BS] [CFP] │ SF3: [BS][CAP][CFP] │ ... │
+│ SF1: [BS][CAP][CFP] │ SF2: [BS] [CAP] [CFP] │ SF3: [BS][CAP][CFP] │ ... │
 └──────────────────────────────────────────────────────────────────────┘
       ↑ CAP in every superframe → backlog cleared rapidly
 ```
