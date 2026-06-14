@@ -255,7 +255,7 @@ If you build upon this work, please cite:
   title     = {Delay-Bounded Adaptive {MAC} for {IEEE} 802.15.4e {DSME}
                Networks: Enhancing Resilience under Bursty and Dynamic
                {IoT} Traffic},
-  booktitle = {[Conference Name]},
+  booktitle = {[ANTS2025]},
   year      = {2025},
   note      = {Supported by DST-SERB Grant SRG/2023/002016}
 }
